@@ -1,0 +1,8 @@
+Testing registration for new user: test_61b6e9
+Register response: 200
+{"id":"ad318874-ae23-4f46-8061-29b4716ad8ae","username":"test_61b6e9","email":null,"is_online":false,"last_seen":"2026-03-10T11:32:45.812079","created_at":"2026-03-10T11:32:45.812079"}
+Register duplicate response: 400
+{"detail":"Registration failed: User with username 'test_61b6e9' already exists."}
+Testing login
+Login response: 200
+{"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzMxNDQxNzAsInN1YiI6ImFkMzE4ODc0LWFlMjMtNGY0Ni04MDYxLTI5YjQ3MTZhZDhhZSJ9.pDh_uw1pYvWsRYRmGInNWiHUUYbPBcF1cgJTcBu7rSA","token_type":"bearer"}
