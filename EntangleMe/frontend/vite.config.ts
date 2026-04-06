@@ -6,7 +6,12 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': 'http://localhost:8000'
+      '/api': 'http://localhost:8000',
+      '/uploads': 'http://localhost:8000'
+    },
+    headers: {
+      "Content-Security-Policy":
+        "img-src 'self' data: blob: http://localhost:8000 /api/;"
     }
   },
   resolve: {

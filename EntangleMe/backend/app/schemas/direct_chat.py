@@ -5,6 +5,8 @@ from datetime import datetime
 class DirectMessageCreate(BaseModel):
     receiver_id: str
     content: str = Field(..., min_length=1)
+    message_type: Optional[str] = "text"
+    file_id: Optional[str] = None
 
 class DirectMessageResponse(BaseModel):
     id: str
@@ -14,4 +16,6 @@ class DirectMessageResponse(BaseModel):
     quantum_state: Optional[str]
     teleportation_result: Optional[dict]
     status: str
+    message_type: Optional[str] = "text"
+    file_id: Optional[str] = None
     created_at: datetime

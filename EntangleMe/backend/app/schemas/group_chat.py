@@ -28,7 +28,9 @@ class GroupMessageResponse(BaseModel):
     sender_id: str
     sender_username: Optional[str] = None
     content: str
-    quantum_state: Optional[str]
-    teleportation_result: Optional[dict]
+    quantum_state: Optional[str] = None
+    teleportation_result: Optional[dict] = None
     status: str
     created_at: datetime
+    message_type: Optional[str] = "text"
+    file_id: Optional[str] = None

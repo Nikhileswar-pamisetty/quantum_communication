@@ -128,6 +128,8 @@ async def get_group_messages(
                 quantum_state=m.quantum_state,
                 teleportation_result=m.teleportation_result,
                 status=m.status,
+                message_type=m.message_type or "text",
+                file_id=m.file_id,
                 created_at=m.created_at
             )
         )
@@ -161,6 +163,8 @@ async def send_group_message(
         quantum_state=message.quantum_state,
         teleportation_result=message.teleportation_result,
         status=message.status,
+        message_type=message.message_type or "text",
+        file_id=message.file_id,
         created_at=message.created_at
     )
 

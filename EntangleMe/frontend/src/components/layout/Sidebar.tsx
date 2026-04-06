@@ -122,7 +122,7 @@ export function Sidebar({ onSelectChat }: { onSelectChat: (chat: any) => void })
                     )}
                   </div>
                   <p className="text-xs text-zinc-500 truncate mt-0.5">
-                    {c.last_message || "Start quantum chat"}
+                    {c.last_message_type === 'file' ? `📎 ${c.last_message_content || c.last_message || 'File'}` : (c.last_message_content || c.last_message || "Start quantum chat")}
                   </p>
                 </div>
               </button>

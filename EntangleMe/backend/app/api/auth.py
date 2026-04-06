@@ -61,10 +61,11 @@ def login_access_token(db: Session = Depends(get_db), form_data: OAuth2PasswordR
         raise HTTPException(status_code=400, detail="Incorrect email or password")
     
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        user.id, expires_delta=access_token_expires
+    )
     return {
-        "access_token": create_access_token(
-            user.id, expires_delta=access_token_expires
-        ),
+        "access_token": access_token,
         "token_type": "bearer",
         "user_id": user.id,
         "username": user.username

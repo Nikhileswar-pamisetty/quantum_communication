@@ -58,30 +58,21 @@ export function ChatRoom({ currentChat, currentUser, onLeave }: ChatRoomProps) {
 
   const fetchMessages = async () => {
     try {
-      let msgs = [];
-      if (currentChat.type === 'direct') {
-        msgs = await api.getDirectMessages(currentChat.id);
-      } else if (currentChat.type === 'group') {
-        msgs = await api.getGroupMessages(currentChat.id);
-        const memberList = await api.getGroupMembers(currentChat.id);
-        setMembers(memberList);
-      } else if (currentChat.type === 'room') {
-        msgs = await api.getMessages(); 
-      }
-      
       const currentUserId = api.getCurrentUserId();
+      const msgs = await api.getDirectMessages(currentChat.id);
+      
       const formatted = msgs.map((m: any) => ({
         id: m.id,
-        sender: m.sender_username || (m.sender_id === currentUserId ? currentUser : 'Other'),
-        sender_id: m.sender_id,
         content: m.content,
-        bit: m.quantum_state && !isNaN(parseInt(m.quantum_state)) && m.quantum_state.length === 1 ? parseInt(m.quantum_state) : undefined,
+        sender_id: m.sender_id,
+        receiver_id: m.receiver_id,
+        message_type: m.message_type || "text",
+        file_id: m.file_id || null,
+        created_at: m.created_at,
+        sender: m.sender_id === currentUserId ? currentUser : 'Other',
         teleportation_result: m.teleportation_result,
         status: m.status,
-        created_at: m.created_at,
-        timestamp: new Date(m.created_at).toLocaleTimeString('en-IN', { hour12: false, hour: '2-digit', minute: '2-digit' }),
-        message_type: m.message_type,
-        file_id: m.file_id
+        timestamp: new Date(m.created_at).toLocaleTimeString('en-IN', { hour12: false, hour: '2-digit', minute: '2-digit' })
       }));
       
       setMessages(prev => {
@@ -110,7 +101,7 @@ export function ChatRoom({ currentChat, currentUser, onLeave }: ChatRoomProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSendText = async () => {
+  const handleSend = async () => {
     if (isSending || (!textMessage.trim() && !selectedFile)) return;
     
     setIsSending(true);
@@ -139,39 +130,28 @@ export function ChatRoom({ currentChat, currentUser, onLeave }: ChatRoomProps) {
         
         clearInterval(progressInterval);
         
-        if (!uploadRes.ok) throw new Error('Upload failed');
+        if (!uploadRes.ok) {
+          const errText = await uploadRes.text();
+          console.error('Upload failed:', uploadRes.status, errText);
+          throw new Error('Upload failed');
+        }
         const fileData = await uploadRes.json();
+        console.log('Upload success, file data:', fileData);
         
-        const payload: any = {
+        const result = await api.sendDirectMessage({
           receiver_id: currentChat.id,
-          text_content: textMessage.trim() || '📎 Attachment',
-          file_id: fileData.id,
-          message_type: 'file'
-        };
-        
-        if (currentChat.type === 'direct') payload.is_direct = true;
-        else if (currentChat.type === 'group') payload.group_id = currentChat.id;
-        else payload.room_id = currentChat.id;
-
-        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/quantum-text/teleport-text`, {
-          method: 'POST',
-          headers: {
-             'Content-Type': 'application/json',
-             'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(payload)
+          content: fileData.file_name || selectedFile.name,
+          message_type: 'file',
+          file_id: fileData.id
         });
-        
-        if (!res.ok) throw new Error('Failed to send file message');
-        const result = await res.json();
         
         setTeleportProgress(100);
         
         const newFileMessage = {
-          id: result.message_id || `temp-${Date.now()}`,
+          id: result.id || `temp-${Date.now()}`,
           sender: currentUser,
           sender_id: currentUserId,
-          content: textMessage.trim() || '📎 Attachment',
+          content: fileData.file_name || selectedFile.name,
           timestamp: new Date().toLocaleTimeString('en-IN', { hour12: false, hour: '2-digit', minute: '2-digit' }),
           message_type: 'file',
           file_id: fileData.id,
@@ -192,19 +172,31 @@ export function ChatRoom({ currentChat, currentUser, onLeave }: ChatRoomProps) {
           setTeleportProgress(prev => Math.min(prev + (100 / (textToSend.length * 8)) * 10, 90));
         }, 200);
 
-        const result = await api.teleportText(
-          currentChat.id, 
-          textToSend, 
-          currentChat.type as any, 
-          currentChat.id
-        );
+        const payload = {
+          receiver_id: currentChat.id,
+          content: textToSend,
+          message_type: 'text'
+        };
+        
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/direct/messages`, {
+          method: 'POST',
+          headers: {
+             'Content-Type': 'application/json',
+             'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+        
+        if (!res.ok) throw new Error('Failed to send message');
+        const result = await res.json();
 
         clearInterval(progressInterval);
         setTeleportProgress(100);
         setTextMessage('');
 
         if (result) {
-          if (result.noise_detected) {
+          if (result.teleportation_result?.noise_detected) {
             toast.warning('⚠️ Quantum Noise Detected', {
               description: 'Teleported message may be slightly corrupted.'
             });
@@ -335,9 +327,9 @@ export function ChatRoom({ currentChat, currentUser, onLeave }: ChatRoomProps) {
                     className={cn("flex w-full group/msg", isMe ? "justify-end" : "justify-start")}
                   >
                     {message.message_type === 'file' ? (
-                       <FileMessageBubble message={message} isMe={isMe} showSender={showSender} />
+                       <FileMessageBubble key={message.id} message={message} isMe={isMe} showSender={showSender} />
                     ) : (
-                      <div className={cn(
+                      <div key={message.id} className={cn(
                         "flex flex-col relative max-w-[85%] px-3 py-1.5 min-w-[100px] shadow-sm",
                         isMe ? "bg-[#005c4b] rounded-l-xl rounded-tr-xl rounded-br-[2px]" : "bg-[#202c33] rounded-r-xl rounded-tl-xl rounded-bl-[2px]"
                       )}>
@@ -446,7 +438,7 @@ export function ChatRoom({ currentChat, currentUser, onLeave }: ChatRoomProps) {
               className="bg-[#2a3942] border-none text-zinc-200 placeholder:text-zinc-500 h-10 pr-12 rounded-xl focus-visible:ring-0"
               value={textMessage}
               onChange={(e) => setTextMessage(e.target.value.slice(0, 50))}
-              onKeyDown={(e) => e.key === 'Enter' && handleSendText()}
+              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
               disabled={isSending}
             />
             <div className={cn(
@@ -462,8 +454,8 @@ export function ChatRoom({ currentChat, currentUser, onLeave }: ChatRoomProps) {
               "rounded-full h-11 w-11 shrink-0 shadow-lg active:scale-90 transition-all",
               isSending ? "bg-zinc-700" : "bg-[#00a884] hover:bg-[#008f72]"
             )}
-            onClick={handleSendText}
-            disabled={isSending || !textMessage.trim()}
+            onClick={handleSend}
+            disabled={isSending || (!textMessage.trim() && !selectedFile)}
           >
             <Send className="w-5 h-5 text-white" />
           </Button>

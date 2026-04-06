@@ -107,7 +107,7 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, name, onSelectChat }) =>
 
   const isAdmin = groupInfo?.created_by === currentUserId;
 
-  const handleSendText = async () => {
+  const handleSend = async () => {
     if (isSending || (!textMessage.trim() && !selectedFile)) return;
     
     setIsSending(true);
@@ -136,8 +136,13 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, name, onSelectChat }) =>
         
         clearInterval(progressInterval);
         
-        if (!uploadRes.ok) throw new Error('Upload failed');
+        if (!uploadRes.ok) {
+          const errText = await uploadRes.text();
+          console.error('Upload failed:', uploadRes.status, errText);
+          throw new Error('Upload failed');
+        }
         const fileData = await uploadRes.json();
+        console.log('Upload success, file data:', fileData);
         
         const payload: any = {
           receiver_id: '',
@@ -563,7 +568,7 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, name, onSelectChat }) =>
             className="bg-[#2a3942] border-none text-zinc-200 placeholder:text-zinc-500 h-10 pr-12 rounded-xl focus-visible:ring-0"
             value={textMessage}
             onChange={(e) => setTextMessage(e.target.value.slice(0, 50))}
-            onKeyDown={(e) => e.key === 'Enter' && handleSendText()}
+            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
             disabled={isSending}
           />
           <div className={cn(
@@ -575,8 +580,8 @@ const GroupChat: React.FC<GroupChatProps> = ({ groupId, name, onSelectChat }) =>
         </div>
         <Button 
           size="icon" 
-          onClick={handleSendText}
-          disabled={isSending || !textMessage.trim()}
+          onClick={handleSend}
+          disabled={isSending || (!textMessage.trim() && !selectedFile)}
           className={cn(
             "rounded-full h-11 w-11 shrink-0 shadow-lg transition-transform active:scale-90",
             isSending ? "bg-zinc-700" : "bg-[#00a884] hover:bg-[#008f72]"

@@ -45,16 +45,24 @@ class ApiClient {
   }
 
   private async fetchWithAuth(url: string, options: RequestInit = {}) {
+    const token = localStorage.getItem("access_token") || localStorage.getItem('token');
+    if (!token) {
+        window.location.href = '/login';
+        throw new Error("No auth token");
+    }
+
     const headers = new Headers(options.headers);
+    headers.set('Authorization', `Bearer ${token}`);
     
-    if (this.token) {
-      headers.set('Authorization', `Bearer ${this.token}`);
+    if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
+        headers.set('Content-Type', 'application/json');
     }
     
     const res = await fetch(url, { ...options, headers });
-    if (res.status === 401) {
-      this.setToken(null);
-      window.location.href = '/login';
+    if (res.status === 403 || res.status === 401) {
+        localStorage.clear();
+        window.location.href = '/login';
+        throw new Error("Session expired or unauthorized");
     }
     return res;
   }
@@ -63,20 +71,28 @@ class ApiClient {
     const formData = new URLSearchParams();
     formData.append('username', username);
     formData.append('password', password);
-    const res = await this.fetchWithAuth(`${API_BASE_URL}/auth/login`, {
+    const res = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: formData.toString(),
     });
     if (!res.ok) throw new Error('Login failed');
     const data = await res.json();
-    localStorage.setItem('user_id', data.user_id);
-    localStorage.setItem('username', data.username);
+    
+    localStorage.setItem("access_token", data.access_token);
+    // keep old token mapping around so frontend code doesn't break
+    localStorage.setItem("token", data.access_token);
+    localStorage.setItem("user_id", data.user_id);
+    localStorage.setItem("username", data.username);
+    
+    this.token = data.access_token;
+    this.currentUserId = data.user_id;
+    this.currentUsername = data.username;
     return data;
   }
 
   async register(username: string, password: string) {
-    const res = await this.fetchWithAuth(`${API_BASE_URL}/auth/register`, {
+    const res = await fetch(`${API_BASE_URL}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
@@ -107,11 +123,15 @@ class ApiClient {
     return res.json();
   }
 
-  async sendDirectMessage(receiverId: string, content: string, quantumState?: string) {
+  async sendDirectMessage(receiverIdOrPayload: any, content?: string, quantumState?: string) {
+    const payload = typeof receiverIdOrPayload === 'object' 
+        ? receiverIdOrPayload 
+        : { receiver_id: receiverIdOrPayload, content, quantum_state: quantumState };
+    
     const res = await this.fetchWithAuth(`${API_BASE_URL}/direct/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ receiver_id: receiverId, content, quantum_state: quantumState })
+      body: JSON.stringify(payload)
     });
     if (!res.ok) throw new Error('Failed to send direct message');
     return res.json();

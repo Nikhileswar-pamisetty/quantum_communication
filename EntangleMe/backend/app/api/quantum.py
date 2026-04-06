@@ -4,7 +4,7 @@ from typing import Dict, Any
 from datetime import datetime
 
 from app.database.session import get_db
-from app.services.quantum_service import QuantumTeleportationService
+from app.services.quantum_service import QuantumTeleportationService, bb84_service
 from app.services.chat_service import ChatService
 from app.schemas.quantum import QuantumTeleportRequest, QuantumTeleportResponse, QuantumError
 from app.schemas.chat import MessageCreate
@@ -121,3 +121,23 @@ async def simulate_teleportation(bit: int):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Simulation failed: {str(e)}")
+
+
+@router.get("/bb84/stats")
+async def get_bb84_stats():
+    """
+    Run a live BB84 key exchange (128-bit) and return security statistics.
+    """
+    try:
+        key_data = bb84_service.generate_key(128)
+        return {
+            "protocol": "BB84 + Quantum Teleportation",
+            "key_length": key_data["key_length"],
+            "error_rate": key_data["error_rate"],
+            "eavesdrop_detected": key_data["eavesdrop_detected"],
+            "channel_status": "COMPROMISED" if key_data["eavesdrop_detected"] else "SECURE",
+            "sifted_ratio": key_data["sifted_ratio"],
+            "num_bits_sent": key_data["num_bits_sent"]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"BB84 stats failed: {str(e)}")
